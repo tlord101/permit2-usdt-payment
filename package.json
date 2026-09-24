@@ -1,0 +1,9 @@
+{
+  "name": "permit2-usdt-payment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reown AppKit + Permit2 USDT gasless payments",
+  "dependencies": {
+    "ethers": "^6.13.4"
+  }
+}
