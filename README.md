@@ -2,6 +2,8 @@
 
 Gasless USDT payments (Reown AppKit + Uniswap Permit2) with a **black / off-black / white / off-white** admin dashboard backed by **Supabase**.
 
+AppKit is installed via **npm** and bundled with **Vite** (no CDN ESM links).
+
 ## Features
 
 - Public payment page (connect → sign Permit2 → backend collects)
@@ -28,7 +30,20 @@ Gasless USDT payments (Reown AppKit + Uniswap Permit2) with a **black / off-blac
 
 ### 3. Deploy
 
-Import this repo on Vercel (Framework: **Other**), set the two env vars, deploy.
+Import this repo on Vercel (Framework: **Other**).
+
+On deploy Vercel runs:
+
+```bash
+npm install
+npm run build   # Vite bundles src/wallet-permit2.js → js/wallet-permit2.js
+```
+
+Packages used:
+
+```bash
+npm install @reown/appkit @reown/appkit-adapter-ethers ethers
+```
 
 ### 4. First login & configure
 
@@ -50,6 +65,16 @@ Import this repo on Vercel (Framework: **Other**), set the two env vars, deploy.
 ### 5. Fund the relayer
 
 Send a little **ETH** to the relayer wallet for gas.
+
+## Local development
+
+```bash
+npm install
+npm run build
+npx vercel dev
+```
+
+Edit `src/wallet-permit2.js`, then `npm run build` again (or use `npx vite build --watch`).
 
 ## Pages
 
