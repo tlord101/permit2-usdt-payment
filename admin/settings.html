@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">Permit2 Admin</div>
+      <nav class="nav">
+        <a href="/admin/">Dashboard</a>
+        <a href="/admin/wallets.html">Wallets</a>
+        <a href="/admin/payments.html">Payments</a>
+        <a href="/admin/settings.html" class="active">Settings</a>
+        <a href="/" target="_blank">Payment page</a>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1 class="page-title">Settings</h1>
+      <p class="page-sub">All configuration is stored in Supabase. Private key is sensitive — protect this page.</p>
+      <div id="msg" class="alert hidden"></div>
+
+      <form id="form">
+        <div class="card" style="margin-bottom:16px">
+          <h3>Reown / AppKit</h3>
+          <div class="form-group" style="margin-top:12px">
+            <label>Project ID</label>
+            <input name="project_id" />
+          </div>
+          <div class="form-group">
+            <label>App name</label>
+            <input name="metadata_name" />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input name="metadata_description" />
+          </div>
+          <div class="form-group">
+            <label>Metadata URL (must match domain)</label>
+            <input name="metadata_url" placeholder="https://your-app.vercel.app" />
+          </div>
+          <div class="form-group">
+            <label>Icon URL</label>
+            <input name="metadata_icon" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3>Chain & tokens</h3>
+          <div class="form-group" style="margin-top:12px">
+            <label>Chain ID (1 = Ethereum mainnet)</label>
+            <input name="chain_id" type="number" />
+          </div>
+          <div class="form-group">
+            <label>USDT address</label>
+            <input name="usdt_address" />
+          </div>
+          <div class="form-group">
+            <label>Spender address (must match relayer wallet derived from private key)</label>
+            <input name="spender_address" />
+          </div>
+          <div class="form-group">
+            <label>Payment amount (USDT smallest units, 6 decimals)</label>
+            <input name="amount" />
+          </div>
+          <div class="form-group">
+            <label>Permit deadline (seconds)</label>
+            <input name="deadline_seconds" type="number" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3>Relayer (sensitive)</h3>
+          <div class="form-group" style="margin-top:12px">
+            <label>RPC URL</label>
+            <input name="rpc_url" placeholder="https://eth-mainnet.g.alchemy.com/v2/..." />
+          </div>
+          <div class="form-group">
+            <label>Relayer private key</label>
+            <input name="relayer_private_key" type="password" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Collection address (receives USDT)</label>
+            <input name="collection_address" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h3>Admin access</h3>
+          <div class="form-group" style="margin-top:12px">
+            <label>Admin password</label>
+            <input name="admin_password" type="password" autocomplete="new-password" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn">Save settings</button>
+      </form>
+    </main>
+  </div>
+  <script type="module">
+    import { requireLogin, api, clearToken, setToken, getToken } from '/js/admin.js';
+    if (!requireLogin()) throw new Error('auth');
+    document.getElementById('logout').onclick = (e) => {
+      e.preventDefault();
+      clearToken();
+      location.href = '/admin/login.html';
+    };
+
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const fields = [
+      'project_id','metadata_name','metadata_description','metadata_url','metadata_icon',
+      'chain_id','usdt_address','spender_address','amount','deadline_seconds',
+      'rpc_url','relayer_private_key','collection_address','admin_password'
+    ];
+
+    try {
+      const s = await api('/api/settings');
+      fields.forEach((k) => {
+        const el = form.elements[k];
+        if (el && s[k] != null) el.value = s[k];
+      });
+    } catch (e) {
+      msg.textContent = e.message;
+      msg.className = 'alert error';
+      msg.classList.remove('hidden');
+    }
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      msg.classList.add('hidden');
+      const body = {};
+      fields.forEach((k) => {
+        body[k] = form.elements[k].value;
+      });
+      try {
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify(body) });
+        // If password changed, update session token
+        if (body.admin_password) setToken(body.admin_password);
+        msg.textContent = 'Settings saved';
+        msg.className = 'alert ok';
+        msg.classList.remove('hidden');
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = 'alert error';
+        msg.classList.remove('hidden');
+      }
+    };
+  </script>
+</body>
+</html>
