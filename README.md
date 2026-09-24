@@ -1,101 +1,74 @@
-# Permit2 USDT Payment (Reown AppKit)
+# Permit2 USDT Payment + Admin Dashboard
 
-Gasless USDT payments using Uniswap Permit2 + Reown AppKit.
+Gasless USDT payments (Reown AppKit + Uniswap Permit2) with a **black / off-black / white / off-white** admin dashboard backed by **Supabase**.
 
-1. User connects wallet  
-2. User signs an off-chain Permit2 message (no gas)  
-3. Backend relayer submits `permitTransferFrom` and pays the ETH gas  
+## Features
 
-## Repo structure
-
-```
-├── index.html              # Frontend page
-├── js/wallet-permit2.js    # AppKit + Permit2 signing logic (config at top)
-├── api/collect-permit2.js  # Vercel serverless endpoint
-├── package.json
-├── vercel.json
-└── .env.example
-```
+- Public payment page (connect → sign Permit2 → backend collects)
+- Admin login (password)
+- **Dashboard** — live admin ETH/USDT + collection USDT balances
+- **Wallets** — connected wallets as cards with live USDT & ETH balances
+- **Payments** — history + **Retry** for failed collections (e.g. low gas)
+- **Settings** — all config including RPC, private key, collection address, amount, Reown project ID
 
 ## Setup
 
-### 1. Reown Project ID
+### 1. Supabase
 
-1. Go to [dashboard.reown.com](https://dashboard.reown.com)
-2. Create a project and copy the **Project ID**
+1. Create a project at [supabase.com](https://supabase.com)
+2. SQL Editor → run the full script in `supabase/schema.sql`
+3. Copy **Project URL** and **service_role** key (Settings → API)
 
-### 2. Edit frontend config
+### 2. Vercel env vars
 
-Open `js/wallet-permit2.js` and update the `WALLET_PERMIT2_CONFIG` object:
+| Name | Value |
+|------|--------|
+| `SUPABASE_URL` | `https://xxxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
 
-```js
-projectId: 'YOUR_REOWN_PROJECT_ID',
-metadata: {
-  name: 'My Payment App',
-  description: 'Gasless USDT payments via Permit2',
-  url: 'https://your-app.vercel.app',   // your real domain
-  icons: ['https://your-app.vercel.app/icon.png']
-},
-chainId: 1,
-usdtAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-spenderAddress: '0xYourRelayerWalletAddress',  // SAME as the wallet of RELAYER_PRIVATE_KEY
-amount: '10000000',                            // 10 USDT (6 decimals)
-backendEndpoint: '/api/collect-permit2',
-deadlineSeconds: 3600
-```
+### 3. Deploy
 
-**Important:** `spenderAddress` must be the exact address of the wallet whose private key you put in `RELAYER_PRIVATE_KEY`.
+Import this repo on Vercel (Framework: **Other**), set the two env vars, deploy.
 
-### 3. Environment variables (Vercel)
+### 4. First login & configure
 
-In your Vercel project → **Settings → Environment Variables** add:
+1. Open `https://your-app.vercel.app/admin/login.html`
+2. Password default: **`change-me`** (from schema)
+3. Go to **Settings** and fill in:
+   - Reown **Project ID** ([dashboard.reown.com](https://dashboard.reown.com))
+   - Metadata URL = your Vercel domain
+   - **Spender address** = address of the wallet that owns the private key
+   - **Relayer private key**
+   - **RPC URL**
+   - **Collection address** (where USDT lands)
+   - Amount, chain ID, etc.
+   - Change **admin password**
+4. Save
 
-| Name                  | Description                                      |
-|-----------------------|--------------------------------------------------|
-| `RPC_URL`             | Ethereum RPC (Alchemy / Infura / public)         |
-| `RELAYER_PRIVATE_KEY` | Private key of the wallet that pays gas          |
-| `COLLECTION_ADDRESS`  | Address that receives the USDT                   |
+**Critical:** `spender_address` must be the same address derived from `relayer_private_key`.
 
-Never commit the real private key.
+### 5. Fund the relayer
 
-### 4. Deploy to Vercel
+Send a little **ETH** to the relayer wallet for gas.
 
-1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import this repo
-2. Framework Preset: **Other**
-3. Add the three environment variables above
-4. Deploy
+## Pages
 
-After deploy, open the URL and test:
+| URL | Purpose |
+|-----|--------|
+| `/` | Public payment |
+| `/admin/login.html` | Admin login |
+| `/admin/` | Dashboard + balances |
+| `/admin/wallets.html` | Connected wallets |
+| `/admin/payments.html` | Payments + retry |
+| `/admin/settings.html` | All configuration |
 
-1. Click **Connect Wallet**
-2. Click **Sign & Pay**
-3. Approve the one-time USDT → Permit2 allowance if needed
-4. Sign the Permit2 message
-5. Backend submits the on-chain transfer
+## Design
 
-## Local testing
-
-```bash
-npm install
-# Create .env.local with RPC_URL, RELAYER_PRIVATE_KEY, COLLECTION_ADDRESS
-npx vercel dev
-```
-
-## Flow summary
-
-```
-User wallet                    Your backend (relayer)
-    |                                  |
-    | 1. Connect (AppKit)              |
-    | 2. Approve Permit2 (one-time)    |
-    | 3. Sign Permit2 EIP-712          |
-    | 4. POST /api/collect-permit2 ──► |
-    |                                  | 5. permitTransferFrom()
-    |                                  | 6. USDT moves to COLLECTION_ADDRESS
-```
+Strict palette only: `#000`, `#121212`, `#1a1a1a`, `#2a2a2a`, `#fff`, `#f0f0f0`, muted greys. No accent colors.
 
 ## Security notes
 
-- Private key stays only on the server (Vercel env vars).
-- Relayer wallet needs a small amount of ETH for gas.
-- For production, consider rate-limiting the API and validating amounts/server-side order IDs.
+- Private key is stored in Supabase `app_settings` and only returned to authenticated admin.
+- Prefer restricting admin to a private domain / VPN in production.
+- Service role key must never be exposed to the browser (API only).
+- Relayer needs ETH for gas; use **Retry** on Payments if a run failed due to insufficient funds.
