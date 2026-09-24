@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">Permit2 Admin</div>
+      <nav class="nav">
+        <a href="/admin/" class="active">Dashboard</a>
+        <a href="/admin/wallets.html">Wallets</a>
+        <a href="/admin/payments.html">Payments</a>
+        <a href="/admin/settings.html">Settings</a>
+        <a href="/" target="_blank">Payment page</a>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-sub">Live admin & collection balances (on-chain)</p>
+
+      <div class="grid" id="cards">
+        <div class="card"><h3>Loading…</h3></div>
+      </div>
+
+      <h2 class="page-title" style="margin-top:36px;font-size:1.1rem">Recent payments</h2>
+      <p class="page-sub">Latest collection attempts</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Tx</th>
+              <th>When</th>
+            </tr>
+          </thead>
+          <tbody id="recent"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { requireLogin, api, clearToken, shortAddr } from '/js/admin.js';
+    if (!requireLogin()) throw new Error('auth');
+    document.getElementById('logout').onclick = (e) => {
+      e.preventDefault();
+      clearToken();
+      location.href = '/admin/login.html';
+    };
+
+    const cards = document.getElementById('cards');
+    try {
+      const bal = await api('/api/admin-balance');
+      cards.innerHTML = `
+        <div class="card">
+          <h3>Admin wallet ETH</h3>
+          <div class="value">${bal.eth != null ? Number(bal.eth).toFixed(6) : '—'} ETH</div>
+          <div class="meta">${bal.address || 'Configure private key in Settings'}</div>
+        </div>
+        <div class="card">
+          <h3>Admin wallet USDT</h3>
+          <div class="value">${bal.usdt != null ? bal.usdt : '—'} USDT</div>
+          <div class="meta">Relayer address balance</div>
+        </div>
+        <div class="card">
+          <h3>Collection USDT</h3>
+          <div class="value">${bal.collectionUsdt != null ? bal.collectionUsdt : '—'} USDT</div>
+          <div class="meta">${bal.collectionAddress || 'Set collection address'}</div>
+        </div>
+      `;
+    } catch (e) {
+      cards.innerHTML = `<div class="card"><h3>Error</h3><div class="meta">${e.message}</div></div>`;
+    }
+
+    try {
+      const { payments } = await api('/api/payments');
+      const tbody = document.getElementById('recent');
+      tbody.innerHTML = (payments || []).slice(0, 8).map((p) => `
+        <tr>
+          <td class="mono">${shortAddr(p.owner_address)}</td>
+          <td>${p.amount}</td>
+          <td><span class="badge ${p.status}">${p.status}</span></td>
+          <td class="mono">${p.tx_hash ? shortAddr(p.tx_hash) : (p.error_message || '—')}</td>
+          <td>${new Date(p.created_at).toLocaleString()}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No payments yet</td></tr>';
+    } catch (e) {
+      document.getElementById('recent').innerHTML = `<tr><td colspan="5">${e.message}</td></tr>`;
+    }
+  </script>
+</body>
+</html>
