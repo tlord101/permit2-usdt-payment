@@ -5,57 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>USDT Permit2 Payment</title>
   <style>
+    :root {
+      --black: #000;
+      --off-black: #121212;
+      --border: #2a2a2a;
+      --white: #fff;
+      --off-white: #f0f0f0;
+      --muted: #a0a0a0;
+    }
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      max-width: 480px;
-      margin: 40px auto;
+      max-width: 440px;
+      margin: 48px auto;
       padding: 0 16px;
-      background: #0f0f12;
-      color: #e8e8ed;
+      background: var(--black);
+      color: var(--off-white);
     }
-    h1 { font-size: 1.4rem; margin-bottom: 8px; }
-    p { color: #9898a6; font-size: 0.9rem; margin-bottom: 24px; }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 8px;
+    }
+    p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
     button {
       display: block;
       width: 100%;
       padding: 14px 20px;
       margin-bottom: 12px;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.15s;
+      font-family: inherit;
     }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    #connect-wallet-btn { background: #6366f1; color: #fff; }
-    #sign-and-pay-btn { background: #22c55e; color: #fff; }
-    button:hover:not(:disabled) { opacity: 0.9; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    #connect-wallet-btn {
+      background: var(--white);
+      color: var(--black);
+      border: 1px solid var(--white);
+    }
+    #sign-and-pay-btn {
+      background: transparent;
+      color: var(--white);
+      border: 1px solid var(--border);
+    }
+    #sign-and-pay-btn:not(:disabled):hover {
+      border-color: var(--white);
+    }
     .status {
-      margin-top: 20px;
-      padding: 12px 14px;
+      margin-top: 16px;
+      padding: 14px 16px;
       border-radius: 8px;
-      background: #1a1a22;
+      background: var(--off-black);
+      border: 1px solid var(--border);
       font-size: 0.85rem;
       word-break: break-all;
     }
-    .status strong { color: #a5b4fc; }
+    .status strong {
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .admin-link {
+      display: block;
+      margin-top: 32px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-decoration: none;
+    }
+    .admin-link:hover { color: var(--white); }
   </style>
 </head>
 <body>
-  <h1>USDT Permit2 Payment</h1>
+  <h1>USDT payment</h1>
   <p>Connect your wallet, then sign a gasless Permit2 authorization. The backend submits the on-chain transfer.</p>
 
-  <button id="connect-wallet-btn">Connect Wallet</button>
-  <button id="sign-and-pay-btn" disabled>Sign & Pay</button>
+  <button id="connect-wallet-btn">Connect wallet</button>
+  <button id="sign-and-pay-btn" disabled>Sign & pay</button>
 
   <div class="status">
-    <strong>Wallet:</strong> <span id="wallet-status">Not connected</span>
+    <strong>Wallet</strong>
+    <span id="wallet-status">Not connected</span>
   </div>
   <div class="status">
-    <strong>Status:</strong> <span id="tx-status">—</span>
+    <strong>Status</strong>
+    <span id="tx-status">—</span>
   </div>
+
+  <a class="admin-link" href="/admin/login.html">Admin</a>
 
   <script type="module" src="/js/wallet-permit2.js"></script>
 </body>
