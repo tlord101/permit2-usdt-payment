@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="login-box">
+    <h1 class="page-title" style="margin-bottom:16px">Admin</h1>
+    <p class="page-sub">Enter admin password (set in Settings after first login defaults to change-me)</p>
+    <div id="msg" class="alert error hidden"></div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="password" autocomplete="current-password" />
+    </div>
+    <button class="btn" id="login-btn" style="width:100%">Sign in</button>
+  </div>
+  <script type="module">
+    import { setToken, getToken } from '/js/admin.js';
+    if (getToken()) location.href = '/admin/';
+
+    document.getElementById('login-btn').onclick = async () => {
+      const pw = document.getElementById('password').value;
+      const msg = document.getElementById('msg');
+      msg.classList.add('hidden');
+      try {
+        // Validate by calling settings with this password
+        const res = await fetch('/api/settings', {
+          headers: { Authorization: 'Bearer ' + pw }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Invalid password');
+        setToken(pw);
+        location.href = '/admin/';
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.classList.remove('hidden');
+      }
+    };
+  </script>
+</body>
+</html>
