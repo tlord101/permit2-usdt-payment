@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payments</title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">Permit2 Admin</div>
+      <nav class="nav">
+        <a href="/admin/">Dashboard</a>
+        <a href="/admin/wallets.html">Wallets</a>
+        <a href="/admin/payments.html" class="active">Payments</a>
+        <a href="/admin/settings.html">Settings</a>
+        <a href="/" target="_blank">Payment page</a>
+        <a href="#" id="logout">Log out</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1 class="page-title">Payments</h1>
+      <p class="page-sub">All collection attempts. Retry if the first run failed (e.g. low gas).</p>
+      <div id="msg" class="alert hidden"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Error / Tx</th>
+              <th>Retries</th>
+              <th>When</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  <script type="module">
+    import { requireLogin, api, clearToken, shortAddr } from '/js/admin.js';
+    if (!requireLogin()) throw new Error('auth');
+    document.getElementById('logout').onclick = (e) => {
+      e.preventDefault();
+      clearToken();
+      location.href = '/admin/login.html';
+    };
+
+    const msg = document.getElementById('msg');
+    const rows = document.getElementById('rows');
+
+    async function load() {
+      const { payments } = await api('/api/payments');
+      rows.innerHTML = (payments || []).map((p) => {
+        const canRetry = p.status === 'failed' || p.status === 'pending';
+        return `
+          <tr data-id="${p.id}">
+            <td class="mono">${shortAddr(p.owner_address)}</td>
+            <td>${p.amount}</td>
+            <td><span class="badge ${p.status}">${p.status}</span></td>
+            <td class="mono">${p.tx_hash ? shortAddr(p.tx_hash) : (p.error_message || '—')}</td>
+            <td>${p.retry_count || 0}</td>
+            <td>${new Date(p.created_at).toLocaleString()}</td>
+            <td>${canRetry ? `<button class="btn btn-outline btn-sm retry" data-id="${p.id}">Retry</button>` : ''}</td>
+          </tr>`;
+      }).join('') || '<tr><td colspan="7">No payments</td></tr>';
+
+      rows.querySelectorAll('.retry').forEach((btn) => {
+        btn.onclick = async () => {
+          btn.disabled = true;
+          msg.classList.add('hidden');
+          try {
+            const data = await api('/api/payments', {
+              method: 'POST',
+              body: JSON.stringify({ id: btn.dataset.id, action: 'retry' })
+            });
+            msg.textContent = 'Success: ' + (data.txHash || 'ok');
+            msg.className = 'alert ok';
+            msg.classList.remove('hidden');
+            await load();
+          } catch (e) {
+            msg.textContent = e.message;
+            msg.className = 'alert error';
+            msg.classList.remove('hidden');
+            btn.disabled = false;
+          }
+        };
+      });
+    }
+
+    try {
+      await load();
+    } catch (e) {
+      rows.innerHTML = `<tr><td colspan="7">${e.message}</td></tr>`;
+    }
+  </script>
+</body>
+</html>
