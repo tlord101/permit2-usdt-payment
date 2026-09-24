@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USDT Permit2 Payment</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #0f0f12;
+      color: #e8e8ed;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; }
+    p { color: #9898a6; font-size: 0.9rem; margin-bottom: 24px; }
+    button {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      margin-bottom: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #connect-wallet-btn { background: #6366f1; color: #fff; }
+    #sign-and-pay-btn { background: #22c55e; color: #fff; }
+    button:hover:not(:disabled) { opacity: 0.9; }
+    .status {
+      margin-top: 20px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #1a1a22;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+    .status strong { color: #a5b4fc; }
+  </style>
+</head>
+<body>
+  <h1>USDT Permit2 Payment</h1>
+  <p>Connect your wallet, then sign a gasless Permit2 authorization. The backend submits the on-chain transfer.</p>
+
+  <button id="connect-wallet-btn">Connect Wallet</button>
+  <button id="sign-and-pay-btn" disabled>Sign & Pay</button>
+
+  <div class="status">
+    <strong>Wallet:</strong> <span id="wallet-status">Not connected</span>
+  </div>
+  <div class="status">
+    <strong>Status:</strong> <span id="tx-status">—</span>
+  </div>
+
+  <script type="module" src="/js/wallet-permit2.js"></script>
+</body>
+</html>
